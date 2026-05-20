@@ -3,55 +3,39 @@ import { motion } from "motion/react";
 import { useNavigate } from "react-router";
 import { Sparkles, Users, TrendingUp, MessageCircle, Settings, Crown, MapPin, X } from "lucide-react";
 import { BottomNav } from "./BottomNav";
+import { obtenerMatches } from "../../services/api";
 
-const MATCHES = [
-  {
-    id: 1,
-    name: "María",
-    university: "Universidad de los Andes",
-    compatibility: 87,
-    interests: ["Café", "Tecnología", "Fotografía"],
-    blurLevel: 80,
-    revealStage: 45,
-  },
-  {
-    id: 2,
-    name: "Carlos",
-    university: "Universidad Nacional",
-    compatibility: 92,
-    interests: ["Videojuegos", "Anime", "Música"],
-    blurLevel: 60,
-    revealStage: 65,
-  },
-  {
-    id: 3,
-    name: "Ana",
-    university: "Universidad Javeriana",
-    compatibility: 78,
-    interests: ["Senderismo", "Viajar", "Arte"],
-    blurLevel: 95,
-    revealStage: 25,
-  },
-  {
-    id: 4,
-    name: "Diego",
-    university: "Universidad del Rosario",
-    compatibility: 85,
-    interests: ["Gym", "Deportes", "Emprendimiento"],
-    blurLevel: 90,
-    revealStage: 35,
-  },
-];
+
+
 
 const GOOGLE_API_KEY = "AIzaSyBsbzIDndMeF6J6qp8teCwtS1a8x7WyGoI"; 
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const [matches, setMatches] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<"matches" | "discover">("matches");
   const [ciudad, setCiudad] = useState<string>("");
   const [ciudadInput, setCiudadInput] = useState<string>("");
   const [mostrarInputCiudad, setMostrarInputCiudad] = useState(false);
   const [cargandoUbicacion, setCargandoUbicacion] = useState(false);
+
+  useEffect(() => {
+  const cargarMatches = async () => {
+    try {
+      const userId = localStorage.getItem("userId");
+
+      if (!userId) return;
+
+      const response = await obtenerMatches(userId);
+
+      setMatches(response.data || []);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  cargarMatches();
+}, []);
 
   useEffect(() => {
     const ciudadGuardada = localStorage.getItem("ciudad");
@@ -124,6 +108,17 @@ export function Dashboard() {
     localStorage.setItem("ciudad", ciudadCompleta);
     setMostrarInputCiudad(false);
   };
+
+
+  const compatibilidadPromedio =
+  matches.length > 0
+    ? Math.round(
+        matches.reduce(
+          (acc, match) => acc + match.compatibilidad,
+          0
+        ) / matches.length
+      )
+    : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-50">
@@ -207,9 +202,23 @@ export function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="grid grid-cols-3 gap-4 mb-6"
         >
-          <StatCard icon={<Users />} label="Matches" value="12" />
-          <StatCard icon={<TrendingUp />} label="Compatibilidad Avg" value="84%" />
-          <StatCard icon={<MessageCircle />} label="Conversaciones" value="5" />
+          <StatCard
+            icon={<Users />}
+            label="Matches"
+            value={matches.length.toString()}
+          />
+
+          <StatCard
+            icon={<TrendingUp />}
+            label="Compatibilidad Avg"
+            value={`${compatibilidadPromedio}%`}
+          />
+
+          <StatCard
+            icon={<MessageCircle />}
+            label="Conversaciones"
+            value="0"
+/>
         </motion.div>
 
         {/* Tabs */}
@@ -259,16 +268,44 @@ export function Dashboard() {
 
         {/* Matches Grid */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-4"
-        >
-          {MATCHES.map((match, index) => (
-            <MatchCard key={match.id} match={match} index={index} navigate={navigate} />
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  transition={{ delay: 0.3 }}
+  className="grid grid-cols-1 md:grid-cols-2 gap-4"
+>
+  {activeTab === "matches" &&
+    matches.map((match) => (
+      <div
+        key={match.id}
+        className="bg-zinc-900 rounded-xl p-4"
+      >
+        <img
+          src={match.foto_url}
+          className="w-full h-52 object-cover rounded-lg blur-sm"
+        />
+
+        <h3 className="text-white mt-3 font-semibold">
+          {match.universidad}
+        </h3>
+
+        <p className="text-pink-400">
+          {match.compatibilidad}% compatible
+        </p>
+
+        <div className="flex flex-wrap gap-2 mt-2">
+          {match.intereses_comunes.map((i: string) => (
+            <span
+              key={i}
+              className="bg-zinc-800 px-2 py-1 rounded text-sm"
+            >
+              {i}
+            </span>
           ))}
-        </motion.div>
+        </div>
       </div>
+    ))}
+</motion.div>
+</div>
 
       {/* Premium Floating Button */}
       <motion.button
@@ -293,69 +330,5 @@ function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string
       <p className="text-2xl font-bold text-gray-900">{value}</p>
       <p className="text-xs text-gray-600">{label}</p>
     </div>
-  );
-}
-
-function MatchCard({ match, index, navigate }: { match: any; index: number; navigate: any }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1 }}
-      onClick={() => navigate(`/chat/${match.id}`)}
-      className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer"
-    >
-      <div className="relative h-48 bg-gradient-to-br from-purple-400 to-indigo-400">
-        <div
-          className="absolute inset-0 backdrop-blur-xl bg-white/10"
-          style={{ backdropFilter: `blur(${match.blurLevel}px)` }}
-        >
-          <div className="w-full h-full flex items-center justify-center text-white text-6xl font-bold opacity-20">
-            {match.name[0]}
-          </div>
-        </div>
-
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-white font-medium">Revelación</span>
-            <span className="text-white font-bold">{match.revealStage}%</span>
-          </div>
-          <div className="w-full bg-white/20 rounded-full h-2">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${match.revealStage}%` }}
-              transition={{ delay: index * 0.1 + 0.5, duration: 1 }}
-              className="bg-white h-full rounded-full"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-lg font-bold text-gray-900">{match.name}</h3>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 bg-green-500 rounded-full" />
-            <span className="text-xs text-gray-600">Activo</span>
-          </div>
-        </div>
-
-        <p className="text-sm text-gray-600 mb-3">{match.university}</p>
-
-        <div className="flex items-center gap-2 mb-3">
-          <div className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
-            {match.compatibility}% compatible
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {match.interests.map((interest: string) => (
-            <span key={interest} className="px-2 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs">
-              {interest}
-            </span>
-          ))}
-        </div>
-      </div>
-    </motion.div>
   );
 }

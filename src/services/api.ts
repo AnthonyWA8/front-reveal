@@ -48,4 +48,12 @@ export const documentoService = {
   }),
 };
 
+export const obtenerMatches = async (userId: string) => {
+  const response = await fetch(
+    `http://localhost:3000/users/${userId}/matches`
+  );
+
+  return response.json();
+};
+
 export default api;
