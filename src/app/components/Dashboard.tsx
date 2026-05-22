@@ -1,47 +1,9 @@
 import { useState, useEffect } from "react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { useNavigate } from "react-router";
-import { Sparkles, Users, TrendingUp, MessageCircle, Settings, Crown, MapPin, X } from "lucide-react";
+import { Sparkles, Users, TrendingUp, MessageCircle, Settings, Crown, MapPin, X, Heart, XCircle } from "lucide-react";
+import { statsService, matchService } from "../../services/api";
 import { BottomNav } from "./BottomNav";
-
-const MATCHES = [
-  {
-    id: 1,
-    name: "María",
-    university: "Universidad de los Andes",
-    compatibility: 87,
-    interests: ["Café", "Tecnología", "Fotografía"],
-    blurLevel: 80,
-    revealStage: 45,
-  },
-  {
-    id: 2,
-    name: "Carlos",
-    university: "Universidad Nacional",
-    compatibility: 92,
-    interests: ["Videojuegos", "Anime", "Música"],
-    blurLevel: 60,
-    revealStage: 65,
-  },
-  {
-    id: 3,
-    name: "Ana",
-    university: "Universidad Javeriana",
-    compatibility: 78,
-    interests: ["Senderismo", "Viajar", "Arte"],
-    blurLevel: 95,
-    revealStage: 25,
-  },
-  {
-    id: 4,
-    name: "Diego",
-    university: "Universidad del Rosario",
-    compatibility: 85,
-    interests: ["Gym", "Deportes", "Emprendimiento"],
-    blurLevel: 90,
-    revealStage: 35,
-  },
-];
 
 const GOOGLE_API_KEY = "AIzaSyBsbzIDndMeF6J6qp8teCwtS1a8x7WyGoI"; 
 
@@ -52,6 +14,17 @@ export function Dashboard() {
   const [ciudadInput, setCiudadInput] = useState<string>("");
   const [mostrarInputCiudad, setMostrarInputCiudad] = useState(false);
   const [cargandoUbicacion, setCargandoUbicacion] = useState(false);
+  const [matches, setMatches] = useState<any[]>([]);
+  const [descubrir, setDescubrir] = useState<any[]>([]);
+  const [matchNotif, setMatchNotif] = useState<string | null>(null);
+
+  const userId = localStorage.getItem("userId") || "";
+
+  useEffect(() => {
+    if (!userId) return;
+    matchService.misMatches(userId).then(r => setMatches(r.data.data)).catch(() => {});
+    matchService.descubrir(userId).then(r => setDescubrir(r.data.data)).catch(() => {});
+  }, [userId]);
 
   useEffect(() => {
     const ciudadGuardada = localStorage.getItem("ciudad");
@@ -257,16 +230,50 @@ export function Dashboard() {
           </div>
         </motion.div>
 
-        {/* Matches Grid */}
+        {/* Matches Grid / Discover */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
           className="grid grid-cols-1 md:grid-cols-2 gap-4"
         >
-          {MATCHES.map((match, index) => (
-            <MatchCard key={match.id} match={match} index={index} navigate={navigate} />
-          ))}
+          {activeTab === "matches" ? (
+            matches.length === 0 ? (
+              <div className="col-span-2 text-center py-16 text-gray-400">
+                <Heart className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>Aún no tienes matches. ¡Ve a Descubrir!</p>
+              </div>
+            ) : (
+              matches.map((match, index) => (
+                <MatchCard key={match.id} match={match} index={index} navigate={navigate} />
+              ))
+            )
+          ) : (
+            descubrir.length === 0 ? (
+              <div className="col-span-2 text-center py-16 text-gray-400">
+                <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>No hay más usuarios por descubrir</p>
+              </div>
+            ) : (
+              descubrir.map((user, index) => (
+                <DiscoverCard
+                  key={user.id}
+                  user={user}
+                  index={index}
+                  onLike={async () => {
+                    const r = await matchService.like(userId, String(user.id));
+                    setDescubrir(prev => prev.filter(u => u.id !== user.id));
+                    if (r.data.match) {
+                      setMatchNotif(user.nombre || "Usuario");
+                      matchService.misMatches(userId).then(res => setMatches(res.data.data)).catch(() => {});
+                      setTimeout(() => setMatchNotif(null), 3000);
+                    }
+                  }}
+                  onSkip={() => setDescubrir(prev => prev.filter(u => u.id !== user.id))}
+                />
+              ))
+            )
+          )}
         </motion.div>
       </div>
 
@@ -282,6 +289,20 @@ export function Dashboard() {
       </motion.button>
 
       <BottomNav />
+
+      <AnimatePresence>
+        {matchNotif && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-4 rounded-2xl shadow-2xl z-50 text-center"
+          >
+            <p className="text-2xl mb-1">🎉</p>
+            <p className="font-bold">¡Match con {matchNotif}!</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -296,65 +317,97 @@ function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string
   );
 }
 
+function DiscoverCard({ user, index, onLike, onSkip }: { user: any; index: number; onLike: () => void; onSkip: () => void }) {
+  const foto = user.fotos?.[0] || user.foto_url;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
+      className="bg-white rounded-2xl overflow-hidden shadow-sm"
+    >
+      <div className="relative h-48 bg-gradient-to-br from-purple-400 to-indigo-400">
+        {foto ? (
+          <img src={foto} alt={user.nombre} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-white text-6xl font-bold opacity-40">
+            {user.nombre?.[0] || "?"}
+          </div>
+        )}
+      </div>
+      <div className="p-4">
+        <h3 className="text-lg font-bold text-gray-900 mb-1">{user.nombre || "Usuario"}</h3>
+        <p className="text-sm text-gray-500 mb-3">{user.universidad || ""} {user.carrera ? `· ${user.carrera}` : ""}</p>
+        <div className="flex gap-3">
+          <button onClick={onSkip} className="flex-1 py-3 rounded-xl border-2 border-gray-200 flex items-center justify-center hover:border-red-300 hover:bg-red-50 transition-all">
+            <XCircle className="w-5 h-5 text-gray-400" />
+          </button>
+          <button onClick={onLike} className="flex-1 py-3 rounded-xl bg-purple-600 flex items-center justify-center hover:bg-purple-700 transition-all">
+            <Heart className="w-5 h-5 text-white" />
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function MatchCard({ match, index, navigate }: { match: any; index: number; navigate: any }) {
+  const handleClick = async () => {
+    const key = `conv_${match.id}`;
+    if (!localStorage.getItem(key)) {
+      localStorage.setItem(key, '1');
+      await statsService.incrementar('conversaciones');
+    }
+    navigate(`/chat/${match.id}`);
+  };
+
+  const foto = match.fotos?.[0] || match.foto_url;
+  const nombre = match.nombre || "Usuario";
+  const intereses: string[] = match.intereses || [];
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
-      onClick={() => navigate(`/chat/${match.id}`)}
+      onClick={handleClick}
       className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer"
     >
       <div className="relative h-48 bg-gradient-to-br from-purple-400 to-indigo-400">
-        <div
-          className="absolute inset-0 backdrop-blur-xl bg-white/10"
-          style={{ backdropFilter: `blur(${match.blurLevel}px)` }}
-        >
+        {foto ? (
+          <img src={foto} alt={nombre} className="w-full h-full object-cover" style={{ filter: "blur(12px)", transform: "scale(1.1)" }} />
+        ) : (
           <div className="w-full h-full flex items-center justify-center text-white text-6xl font-bold opacity-20">
-            {match.name[0]}
+            {nombre[0]}
           </div>
-        </div>
-
+        )}
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-white font-medium">Revelación</span>
-            <span className="text-white font-bold">{match.revealStage}%</span>
+            <span className="text-white font-bold">0%</span>
           </div>
           <div className="w-full bg-white/20 rounded-full h-2">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${match.revealStage}%` }}
-              transition={{ delay: index * 0.1 + 0.5, duration: 1 }}
-              className="bg-white h-full rounded-full"
-            />
+            <div className="bg-white h-full rounded-full w-0" />
           </div>
         </div>
       </div>
 
       <div className="p-4">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-lg font-bold text-gray-900">{match.name}</h3>
+          <h3 className="text-lg font-bold text-gray-900">{nombre}</h3>
           <div className="flex items-center gap-1">
             <div className="w-2 h-2 bg-green-500 rounded-full" />
             <span className="text-xs text-gray-600">Activo</span>
           </div>
         </div>
-
-        <p className="text-sm text-gray-600 mb-3">{match.university}</p>
-
-        <div className="flex items-center gap-2 mb-3">
-          <div className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
-            {match.compatibility}% compatible
+        <p className="text-sm text-gray-600 mb-3">{match.universidad || ""}</p>
+        {intereses.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {intereses.slice(0, 3).map((interest: string) => (
+              <span key={interest} className="px-2 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs">{interest}</span>
+            ))}
           </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {match.interests.map((interest: string) => (
-            <span key={interest} className="px-2 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs">
-              {interest}
-            </span>
-          ))}
-        </div>
+        )}
       </div>
     </motion.div>
   );

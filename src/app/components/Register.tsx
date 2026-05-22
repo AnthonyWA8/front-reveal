@@ -43,16 +43,6 @@ export function Register() {
       localStorage.setItem("email", form.email);
       localStorage.setItem("nombre", form.nombre);
 
-      // 2. Crear perfil en user-service
-      await userService.crearPerfil({
-        id: userId,
-        email: form.email,
-        nombre: form.nombre,
-        edad: parseInt(form.edad),
-        universidad: form.universidad,
-        carrera: form.carrera,
-      });
-
       navigate("/verificar");
     } catch (err: any) {
       setError(err.response?.data?.error || "Error al crear la cuenta");

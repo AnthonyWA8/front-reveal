@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3000';
+const API_URL = 'http://localhost:3001';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -46,6 +46,27 @@ export const documentoService = {
   verificarCarnet: (formData: FormData) => api.post('/documento/verificar', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+};
+
+// MATCHES
+export const matchService = {
+  descubrir: (userId: string) => api.get(`/matches/descubrir/${userId}`),
+  like: (emisorId: string, receptorId: string) => api.post('/matches/like', { emisorId, receptorId }),
+  misMatches: (userId: string) => api.get(`/matches/mis-matches/${userId}`),
+};
+
+// STATS
+export const statsService = {
+  incrementar: (campo: 'matches' | 'conversaciones' | 'planes_exitosos') => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return Promise.resolve();
+    return api.post(`/users/${userId}/stats`, { campo });
+  },
+  actualizarCompatibilidad: (valor: number) => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return Promise.resolve();
+    return api.post(`/users/${userId}/stats`, { campo: 'compatibilidad', valor });
+  },
 };
 
 export default api;

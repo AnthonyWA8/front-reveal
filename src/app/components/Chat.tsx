@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useNavigate, useParams } from "react-router";
 import { ArrowLeft, Send, Info, Sparkles, Lock } from "lucide-react";
 import { io, Socket } from "socket.io-client";
-import { userService } from "../../services/api";
+import { userService, statsService } from "../../services/api";
 
 const CHAT_URL = "http://localhost:3005";
 
@@ -82,6 +82,7 @@ export function Chat() {
     s.on("recomendacion_lugares", (data) => {
       setLugares(data.lugares);
       setShowLugares(true);
+      statsService.incrementar('planes_exitosos');
     });
 
     return () => { s.disconnect(); };
